@@ -214,3 +214,40 @@ export async function confirmRestAction(fd: FormData) {
   revalidatePath("/hoy");
   redirect("/hoy");
 }
+
+/* ------------------------------------------------------------------ */
+/* Entrenador (IA) y campaña                                           */
+/* ------------------------------------------------------------------ */
+
+export async function askCoachAction(fd: FormData) {
+  const { user } = await profileOrOnboarding();
+  const q = String(fd.get("question") ?? "").trim();
+  if (q) {
+    const { askCoach } = await import("@/ai/coach");
+    await askCoach(db, user.id, q);
+  }
+  revalidatePath("/entrenador");
+  redirect("/entrenador#ultimo");
+}
+
+export async function decideProposalAction(fd: FormData) {
+  const { user } = await profileOrOnboarding();
+  const { decideProposal } = await import("@/server/proposals");
+  const id = String(fd.get("proposalId") ?? "");
+  const accept = fd.get("decision") === "apply";
+  const r = await decideProposal(db, user.id, id, accept).catch((e) => {
+    if (e instanceof ConflictError) return { status: "invalid" as const };
+    throw e;
+  });
+  revalidatePath("/entrenador");
+  revalidatePath("/hoy");
+  redirect(r.status === "applied" ? "/hoy" : "/entrenador");
+}
+
+export async function revertPenaltyAction(fd: FormData) {
+  const { user } = await profileOrOnboarding();
+  const { revertMomentumPenalty } = await import("@/server/game");
+  await revertMomentumPenalty(db, user.id, String(fd.get("eventId") ?? ""));
+  revalidatePath("/cazador");
+  redirect("/cazador");
+}

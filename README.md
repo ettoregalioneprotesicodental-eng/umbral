@@ -2,7 +2,7 @@
 
 Aplicación web instalable (PWA) de entrenamiento físico personal con progresión de cazador. El entrenamiento se decide con reglas comprobables; la IA (Claude) explica y propone, pero nunca concede recompensas ni guarda planes sin validación.
 
-> **Estado:** paso 2 de 4. Ya puedes calibrar tu perfil, recibir la misión del día ajustada a tu tiempo y material, entrenar con la sesión guiada, registrar series y ganar XP. La IA funciona en **modo demostración** (sin coste). Detalle en [`docs/ESTADO.md`](docs/ESTADO.md).
+> **Estado:** paso 3 de 4. Calibras tu perfil, recibes la misión del día ajustada a tu tiempo y material, entrenas con la sesión guiada y ganas XP. Además: avatar con objetos, primer jefe («Guardián del Umbral»), impulso con penalizaciones suaves y revertibles, y un entrenador al que preguntar. La IA funciona en **modo demostración** (sin coste); la integración real con Claude está preparada y desactivada. Detalle en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Documentos
 
@@ -57,7 +57,17 @@ No se envían correos reales. El enlace de restablecimiento aparece en la consol
 2. Rellena tus días, minutos reales, material (por ejemplo, los pesos de tus mancuernas) y cualquier molestia que quieras declarar.
 3. En **Hoy** haz el chequeo de 20 segundos y pulsa **Empezar misión**.
 4. En la sesión: «Serie hecha» registra la serie y arranca el descanso. Toca una serie registrada para corregirla.
-5. Al terminar verás el resumen y la XP. Tu historial está en **Historial**.
+5. Al terminar verás el resumen, la XP y si has roto un sello del jefe. Tu historial está en **Historial**.
+6. En **Cazador** ves tu avatar, el jefe, tus objetos y la crónica. En **Entrenador** puedes preguntar «¿por qué esta misión hoy?» o «hazla más corta»: los cambios se proponen y solo se aplican si pulsas **Aplicar**.
+
+## Activar Claude (opcional, tiene coste)
+
+No lo actives sin decidirlo: cada respuesta consume API de pago. Cuando quieras:
+
+1. Crea una clave en <https://console.anthropic.com/> → *API Keys* (requiere cuenta con saldo).
+2. En `.env` (o en los secretos del servidor), pon `AI_MODE=claude`, `ANTHROPIC_API_KEY=` con tu clave, y si quieres ahorro `CLAUDE_MODEL=claude-haiku-5-5`.
+3. Ajusta `AI_DAILY_BUDGET_USD` y `AI_MONTHLY_BUDGET_USD`. El servidor reserva el peor caso antes de cada llamada y no llama si no cabe.
+4. Reinicia `npm start`. La página **Entrenador** mostrará el gasto del día y del mes.
 
 ## Comandos
 

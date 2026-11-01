@@ -48,6 +48,7 @@ export default async function HistorialPage() {
               </tbody>
             </table>
           )}
+          <p style={{ marginTop: 10 }}><Link href="/ejercicios">Biblioteca de ejercicios</Link></p>
         </section>
         {byExercise.size > 0 && (
           <section className="system-window">

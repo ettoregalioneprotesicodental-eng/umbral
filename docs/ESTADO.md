@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-01 · Paso 2 de 4 (circuito completo de entrenamiento) **completado**.
+Última actualización: 2026-11-01 · Paso 3 de 4 (IA preparada, avatar y primer arco jugable) **completado**.
 Leyenda: **probado** = prueba automática ejecutada y en verde · **simulado** = funciona con un sustituto identificado · **pendiente** = no implementado.
 
 ## Qué funciona realmente (probado)
@@ -26,12 +26,22 @@ Leyenda: **probado** = prueba automática ejecutada y en verde · **simulado** =
 - **Historial** de sesiones y evolución por ejercicio sin mezclar cargas ni unidades.
 - **Biblioteca** de ejercicios con ficha completa.
 
+### IA y juego (paso 3)
+- **Entrenador** (`/entrenador`): chat sobre tu misión. Con Claude activado usa un bucle de herramientas limitadas (perfil, misión de hoy, historial, ejercicios aprobados, estado de campaña y una herramienta para **proponer** cambios). No puede dar XP, objetos ni cambiar reglas. Cada propuesta pasa por el mismo validador que el plan y solo se aplica si pulsas «Aplicar» y la misión no ha cambiado entretanto.
+- **Presupuesto de IA**: se reserva el peor caso antes de cada llamada, con topes diario y mensual y una ejecución a la vez por usuario. Si no cabe, no se llama y se avisa. Si la API cae o responde mal, el entrenamiento sigue igual.
+- **Jefe «Guardián del Umbral»**: tres sellos; cada misión planificada de entrenamiento o movilidad completada rompe uno. Sin volumen extra. Al derrotarlo: 150 XP una sola vez, Daga del Guardián y Sombra compañera.
+- **Avatar** vectorial original con capa (nivel 3), aura azul (5), aura violeta (10), armadura (15) y los objetos del jefe. Respeta «reducir animaciones».
+- **Impulso**: +5 por misión válida (una vez al día). Las misiones de entrenamiento sin hacer ni reprogramar restan 5 a partir del segundo día, como máximo 15 por semana y nunca por debajo de 70. Se puede revertir cada penalización («fue enfermedad, viaje o un fallo»). «Hoy no puedo», descansos y exenciones nunca penalizan; con penalizaciones desactivadas no se resta nada.
+- **Rango D**: jefe derrotado y 12 misiones cumplidas.
+- **Crónica**: prólogo, capítulo 1 y líneas de cada sello, como hechos guardados. La historia solo refleja lo registrado.
+
 ## Qué está simulado (identificado en la interfaz)
-- **IA**: modo demostración. Saludos de plantilla marcados como tales. No hay llamadas a la API.
+- **IA**: modo demostración. El entrenador responde con plantillas marcadas «[Demostración]» y puede proponer una versión más corta usando las reglas (sin IA). No hay llamadas a la API ni coste. La integración real está implementada y probada con un cliente simulado, **no** contra la API real (no autorizado).
 - **Correo**: los enlaces de recuperación se guardan en `.dev-mail/outbox.jsonl` y en la consola.
 
 ## Pendiente
-- Paso 3: integración real con Claude (preparada por configuración, sin activar por decisión de coste), avatar, jefe «Guardián del Umbral», penalización de impulso por omisión, misiones secundarias.
+- Activar Claude real: requiere tu decisión, una clave y saldo (ver README, «Activar Claude»).
+- Misiones secundarias, más jefes y capítulos (paso 5).
 - Paso 4: service worker para abrir la app sin conexión (hoy el registro offline funciona si la página ya está abierta), instalación como app en Android con HTTPS, iconos PNG, notificaciones, resolución de conflictos entre dos dispositivos editando la misma serie (hoy gana la última revisión, que se conserva numerada).
 - Fichas: revisión por una persona cualificada; recursos visuales con licencia.
 - Planes versionados como tablas separadas (hoy cada misión guarda su prescripción completa y la versión de reglas).
@@ -40,10 +50,10 @@ Leyenda: **probado** = prueba automática ejecutada y en verde · **simulado** =
 | Conjunto | Resultado |
 |---|---|
 | `npm run typecheck` / `npm run build` | correctos |
-| `npm test` (Vitest: 54 unitarias + 19 de integración con PostgreSQL real) | 73/73 |
-| `npm run test:e2e` (Playwright: 12 escenarios × escritorio Chromium y Pixel 7 emulado, repetido 2 veces) | 48/48 |
+| `npm test` (Vitest: 59 unitarias + 40 de integración con PostgreSQL real) | 99/99 |
+| `npm run test:e2e` (Playwright: 14 escenarios × escritorio Chromium y Pixel 7 emulado, repetido 2 veces) | 56/56 |
 
-Las pruebas E2E encontraron y se corrigieron tres fallos reales: el campo de minutos rechazaba valores que no fueran múltiplos de 5, el formulario de calibración se desbordaba en móvil, y en móvil no había forma de cerrar sesión antes de completar la calibración.
+Las pruebas E2E encontraron y se corrigieron fallos reales: en el paso 2, el campo de minutos, el desbordamiento de la calibración en móvil y la falta de cierre de sesión antes de calibrar; en el paso 3, la barra de navegación móvil con 5 secciones ocupaba dos filas y tapaba el botón de terminar sesión.
 
 «Pixel 7 emulado» es emulación de pantalla y táctil en Chromium: **no** equivale a un Android real.
 
@@ -53,4 +63,4 @@ Las pruebas E2E encontraron y se corrigieron tres fallos reales: el campo de min
 - Si se borran los datos del navegador con series sin sincronizar, esas series se pierden.
 
 ## Punto de reanudación
-Siguiente acción: **paso 3**. Empezar por `src/ai/` (adaptador de Claude con herramientas limitadas y esquema de propuesta que pase por `validatePrescription`), presupuesto de uso y modo demo, después avatar, misiones y jefe en `src/domain/game/`.
+Siguiente acción: **paso 4** (móvil y sin conexión): service worker, IndexedDB para la cola, iconos PNG, instalación en Android con HTTPS gratuito, recordatorios y resolución de conflictos entre dispositivos.

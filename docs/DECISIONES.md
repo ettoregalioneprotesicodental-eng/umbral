@@ -54,6 +54,15 @@ El cliente genera el id de cada serie y la guarda primero en `localStorage` en u
 ## D10 · Calendario y progresión
 Calendario fijo por días elegidos (A/B/movilidad) para poder comparar sesiones. La variedad no cambia los ejercicios base; la progresión usa una sola palanca cada vez (carga → variante → series) y reglas en `src/domain/training/rules.ts`.
 
+## D11 · Claude con herramientas limitadas y bucle manual
+El entrenador usa el SDK oficial `@anthropic-ai/sdk` con un bucle manual de herramientas (máximo 3 vueltas; la última sin herramientas para obligar a cerrar). Pensamiento adaptativo y esfuerzo `low` para acotar coste. Seis herramientas de solo lectura y una de propuesta, todas con `strict: true` y ejecutadas con el usuario de la sesión. No existe ninguna herramienta que conceda XP u objetos ni que guarde planes: `propose_plan_revision` deja una propuesta que pasa por `validatePrescription` y que el usuario aplica con un botón si la misión no ha cambiado (revisión). No se usa reintento automático con otro modelo: si la API falla, la respuesta es un aviso y el entrenamiento sigue igual.
+
+## D12 · Presupuesto de IA reservado antes de gastar
+Cada llamada reserva su peor caso (iteraciones × tokens máximos × precio) bajo un bloqueo de PostgreSQL y después liquida el coste real. Topes diario y mensual configurables, y una ejecución a la vez por usuario. Modelo sin precio conocido = precio más alto.
+
+## D13 · Juego derivado del registro
+Sellos del jefe, impulso, objetos y rango se calculan en la misma transacción que cierra la misión, con índices únicos por misión. El jefe se derrota con misiones planificadas (sin volumen extra). Las misiones omitidas se procesan con un día de margen, solo de los últimos 7 días, una vez por misión y dentro del máximo semanal; cualquier penalización se puede revertir (enfermedad, viaje, fallo) y la misión queda exenta. Los textos de historia son plantillas originales; la IA puede narrar con `get_campaign_state`, pero no crear hechos.
+
 ## Supuestos del perfil de arranque
 Los datos personales del usuario no se guardan en este repositorio público. El diseño asume un perfil de arranque exigente para las restricciones: entrenamiento en casa con material mínimo (mancuernas ligeras y esterilla), regreso tras un periodo de inactividad, sesiones cortas (10–20 min) varios días a la semana y alguna molestia ocasional declarada. El onboarding confirmará y permitirá editar cada dato. Si faltan datos, la calibración es conservadora.
 

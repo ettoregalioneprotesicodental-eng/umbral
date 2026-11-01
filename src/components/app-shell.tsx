@@ -4,10 +4,13 @@ import { SignOutButton } from "./sign-out-button";
 
 const NAV = [
   ["/hoy", "Hoy"],
+  ["/cazador", "Cazador"],
+  ["/entrenador", "Entrenador"],
   ["/historial", "Historial"],
-  ["/ejercicios", "Ejercicios"],
   ["/perfil", "Perfil"],
 ] as const;
+/** En escritorio cabe también la biblioteca; en móvil se llega desde Historial y desde cada misión. */
+const DESKTOP_NAV = [...NAV.slice(0, 4), ["/ejercicios", "Ejercicios"], NAV[4]] as const;
 
 export function AppShell({ current, children, reducedMotion = false }: { current: string; children: React.ReactNode; reducedMotion?: boolean }) {
   const ai = getAiStatus();
@@ -17,7 +20,7 @@ export function AppShell({ current, children, reducedMotion = false }: { current
         <header className="topbar">
           <Link className="brand" href="/hoy">UMBR<span>A</span>L</Link>
           <nav className="desktop-only top-nav" aria-label="Navegación principal">
-            {NAV.map(([href, label]) => (
+            {DESKTOP_NAV.map(([href, label]) => (
               <Link key={href} href={href} aria-current={current === href ? "page" : undefined}>{label}</Link>
             ))}
           </nav>

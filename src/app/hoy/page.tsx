@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/session";
 import { db, schema } from "@/lib/db";
 import { loadHunter } from "@/server/hunter";
-import { ensureTodayMission, getCheckin, getProfile } from "@/server/training";
+import { ensureTodayMission, getCheckin, getProfile, todayFor } from "@/server/training";
+import { ensureEncounter, processMissedMissions } from "@/server/game";
+import { getBoss } from "@/domain/game/content";
 import { systemGreeting } from "@/ai/provider";
 import { requireExercise } from "@/domain/training/catalog";
 import { AREA_LABELS } from "@/domain/training/planner";
@@ -39,7 +41,11 @@ export default async function HoyPage() {
       </section>
     );
   } else {
+    // Antes de preparar hoy, se cierran las misiones vencidas (con margen de un día y sin castigo si está desactivado).
+    await processMissedMissions(db, profile, todayFor(profile));
     const mission = await ensureTodayMission(db, profile);
+    const encounter = await ensureEncounter(db, user.id);
+    const boss = getBoss(encounter.bossId);
     const checkin = await getCheckin(db, user.id, mission.localDate);
     const p = mission.prescription;
     const [ws] = await db.select({ id: schema.workoutSession.id, xp: schema.workoutSession.xpAwarded }).from(schema.workoutSession).where(eq(schema.workoutSession.plannedSessionId, mission.id));
@@ -131,6 +137,12 @@ export default async function HoyPage() {
           )}
           {mission.status === "exempt" && (
             <p>Misión exenta por seguridad. No cuenta como omisión ni genera penalización.</p>
+          )}
+
+          {encounter.status === "active" && (
+            <p className="small" data-testid="boss-hint" style={{ marginTop: 10 }}>
+              <Link href="/cazador">{boss.name}</Link>: {encounter.sealsBroken} de {encounter.seals} sellos rotos. {p.kind !== "rest" && mission.status === "planned" ? "Completar esta misión rompe uno." : ""}
+            </p>
           )}
 
           {mission.status === "planned" && checkin && p.kind !== "rest" && (

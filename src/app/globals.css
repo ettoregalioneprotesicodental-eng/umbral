@@ -186,7 +186,8 @@ details summary { cursor: pointer; min-height: 40px; display: flex; align-items:
 .top-nav { gap: 4px; }
 .top-nav a { padding: 8px 12px; border-radius: var(--radius-sm); color: var(--text-muted); text-decoration: none; }
 .top-nav a[aria-current="page"] { color: var(--text); background: rgba(111, 140, 255, 0.14); }
-.bottom-nav { grid-template-columns: repeat(4, 1fr); }
+.bottom-nav { grid-template-columns: repeat(5, 1fr); }
+.bottom-nav a { font-size: 0.78rem; padding: 0 2px; text-align: center; overflow-wrap: anywhere; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .row > * { flex: 1 1 auto; }
 .ex-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -210,3 +211,23 @@ table.log { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 table.log th, table.log td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(110,140,255,0.15); }
 .field > * { min-width: 0; }
 .field select { width: 100%; }
+
+/* ---------- Paso 3: cazador, jefe y entrenador ---------- */
+.avatar { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.aura-pulse { animation: aura 3.2s ease-in-out infinite; transform-origin: 50% 55%; }
+@keyframes aura { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .aura-pulse { animation: none; } }
+.reduced-motion .aura-pulse { animation: none; }
+.seals { display: flex; gap: 10px; margin: 10px 0; }
+.seal { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); display: grid; place-items: center; font-family: var(--font-mono); }
+.seal.broken { border-style: dashed; opacity: 0.45; text-decoration: line-through; }
+.item-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.item-list li { background: var(--bg-raised); border-radius: var(--radius-sm); padding: 10px; border: 1px solid rgba(110, 140, 255, 0.15); }
+.chronicle { padding-left: 18px; }
+.chronicle li { margin-bottom: 8px; }
+.chat { display: grid; gap: 10px; }
+.msg { border-radius: var(--radius-sm); padding: 10px 12px; max-width: 92%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-user { justify-self: end; background: rgba(111, 140, 255, 0.16); }
+.msg-assistant { justify-self: start; background: var(--bg-raised); border: 1px solid rgba(110, 140, 255, 0.15); }
+.msg .origin { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+.chat-form textarea { width: 100%; min-height: 72px; }
