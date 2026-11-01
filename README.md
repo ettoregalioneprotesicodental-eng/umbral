@@ -2,7 +2,7 @@
 
 Aplicación web instalable (PWA) de entrenamiento físico personal con progresión de cazador. El entrenamiento se decide con reglas comprobables; la IA (Claude) explica y propone, pero nunca concede recompensas ni guarda planes sin validación.
 
-> **Estado:** paso 1 de 4 (base ejecutable). Cuentas, panel «Hoy», personaje y reglas de XP funcionan. El onboarding, la misión diaria y el registro de series llegan en el paso 2. La IA funciona en **modo demostración** (sin coste). Detalle en [`docs/ESTADO.md`](docs/ESTADO.md).
+> **Estado:** paso 2 de 4. Ya puedes calibrar tu perfil, recibir la misión del día ajustada a tu tiempo y material, entrenar con la sesión guiada, registrar series y ganar XP. La IA funciona en **modo demostración** (sin coste). Detalle en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Documentos
 
@@ -50,6 +50,14 @@ Mientras `npm start` está en marcha en el ordenador, el móvil puede abrir `htt
 ### Recuperar contraseña en local
 
 No se envían correos reales. El enlace de restablecimiento aparece en la consola donde ejecutas `npm start` y en `.dev-mail/outbox.jsonl`.
+
+## Primer uso
+
+1. Crea tu cuenta y pulsa **Empezar calibración**.
+2. Rellena tus días, minutos reales, material (por ejemplo, los pesos de tus mancuernas) y cualquier molestia que quieras declarar.
+3. En **Hoy** haz el chequeo de 20 segundos y pulsa **Empezar misión**.
+4. En la sesión: «Serie hecha» registra la serie y arranca el descanso. Toca una serie registrada para corregirla.
+5. Al terminar verás el resumen y la XP. Tu historial está en **Historial**.
 
 ## Comandos
 

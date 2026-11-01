@@ -30,6 +30,7 @@ export interface GreetingContext {
   level: number;
   /** Días con cuenta. Solo datos reales; nunca inventar logros. */
   daysSinceJoin: number;
+  onboarded?: boolean;
 }
 
 export interface GeneratedText {
@@ -40,9 +41,10 @@ export interface GeneratedText {
 
 /** Saludo del sistema. En esta fase siempre es una plantilla identificada. */
 export function systemGreeting(ctx: GreetingContext): GeneratedText {
-  const text =
-    ctx.daysSinceJoin === 0
-      ? `Sistema: despertar confirmado, ${ctx.alias}. Tu portal se abrirá cuando completes la calibración.`
+  const text = !ctx.onboarded
+    ? `Sistema: despertar confirmado, ${ctx.alias}. Tu portal se abrirá cuando completes la calibración.`
+    : ctx.daysSinceJoin === 0
+      ? `Sistema: calibración registrada, ${ctx.alias}. El portal está preparado y la misión está ajustada a tu tiempo.`
       : `Sistema: el portal sigue aquí, ${ctx.alias}. Nivel ${ctx.level}. Reanudaremos desde tu capacidad actual.`;
   return { text, origin: "template" };
 }

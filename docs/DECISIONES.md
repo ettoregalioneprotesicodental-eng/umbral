@@ -45,6 +45,15 @@ Instantes en UTC (`timestamptz`); el calendario del usuario usa una zona IANA en
 ## D07 · Datos personales fuera del repositorio
 El repositorio es público. Los datos iniciales del usuario (material, experiencia, molestias, objetivo) se introducen en el onboarding y viven solo en su base de datos.
 
+## D08 · Misión diaria con prescripción embebida
+Cada misión (`planned_session`) guarda su prescripción completa, la versión de reglas y una revisión. Se puede regenerar mientras no se ha empezado; al empezar se copia a `workout_session` y queda inmutable. Es más simple que tablas separadas de planes y versiones y cumple la trazabilidad necesaria por ahora.
+
+## D09 · Registro de series con id del cliente
+El cliente genera el id de cada serie y la guarda primero en `localStorage` en una cola. El servidor hace `upsert` por id comprobando propietario y sesión. Así los reenvíos no duplican y el registro sobrevive a recargas y cortes. IndexedDB y service worker llegan en el paso 4.
+
+## D10 · Calendario y progresión
+Calendario fijo por días elegidos (A/B/movilidad) para poder comparar sesiones. La variedad no cambia los ejercicios base; la progresión usa una sola palanca cada vez (carga → variante → series) y reglas en `src/domain/training/rules.ts`.
+
 ## Supuestos del perfil de arranque
 Los datos personales del usuario no se guardan en este repositorio público. El diseño asume un perfil de arranque exigente para las restricciones: entrenamiento en casa con material mínimo (mancuernas ligeras y esterilla), regreso tras un periodo de inactividad, sesiones cortas (10–20 min) varios días a la semana y alguna molestia ocasional declarada. El onboarding confirmará y permitirá editar cada dato. Si faltan datos, la calibración es conservadora.
 
