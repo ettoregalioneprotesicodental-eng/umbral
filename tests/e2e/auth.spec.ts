@@ -6,6 +6,13 @@ function uniqueEmail(tag: string) {
   return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@prueba.local`;
 }
 
+async function signOut(page: Page) {
+  const btn = page.locator("button:visible", { hasText: "Salir" });
+  if ((await btn.count()) === 0) await page.goto("/perfil").catch(() => {});
+  if ((await btn.count()) === 0) await page.goto("/hoy");
+  await btn.first().click();
+}
+
 async function register(page: Page, alias: string, email: string, password: string) {
   await page.goto("/acceso");
   await page.getByRole("tab", { name: "Crear cuenta" }).click();
@@ -25,7 +32,7 @@ test("AC01: registro, panel Hoy, cierre y nuevo acceso", async ({ page }) => {
   await expect(page.getByText("MODO DEMO · IA SIMULADA")).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "100");
 
-  await page.locator("button:visible", { hasText: "Salir" }).first().click();
+  await signOut(page);
   await page.waitForURL("**/acceso");
 
   await page.goto("/hoy");
@@ -41,7 +48,7 @@ test("AC01: registro, panel Hoy, cierre y nuevo acceso", async ({ page }) => {
 test("contraseña incorrecta muestra un error comprensible", async ({ page }) => {
   const email = uniqueEmail("bad");
   await register(page, "Iria", email, "contrasena-segura-2");
-  await page.locator("button:visible", { hasText: "Salir" }).first().click();
+  await signOut(page);
   await page.waitForURL("**/acceso");
   await page.getByLabel("Correo electrónico").fill(email);
   await page.getByLabel("Contraseña").fill("otra-contrasena-mal");
@@ -52,7 +59,7 @@ test("contraseña incorrecta muestra un error comprensible", async ({ page }) =>
 test("AC01: recuperación de acceso con enlace de restablecimiento", async ({ page }) => {
   const email = uniqueEmail("reset");
   await register(page, "Noa", email, "contrasena-original");
-  await page.locator("button:visible", { hasText: "Salir" }).first().click();
+  await signOut(page);
   await page.waitForURL("**/acceso");
 
   await page.getByRole("link", { name: "¿Has olvidado tu contraseña?" }).click();

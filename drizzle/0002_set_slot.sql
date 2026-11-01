@@ -1,0 +1,1 @@
+ALTER TABLE "set_log" ADD COLUMN "slot" text NOT NULL;

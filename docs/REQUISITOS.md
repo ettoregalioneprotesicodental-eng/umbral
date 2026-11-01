@@ -7,20 +7,20 @@ Estado: ✅ probado · 🟡 parcial · ⬜ pendiente. «Probado» significa con 
 
 | ID | Requisito | Prio | Fase | Depende de | Cómo se comprueba | Estado |
 |---|---|---|---|---|---|---|
-| AC01 | Registro, acceso, recuperación; aislamiento entre usuarios | P0 | 1–2 | — | E2E `auth.spec.ts`; integración `ledger.test.ts` (corrección ajena); paso 2: pruebas por ruta | 🟡 auth ✅, aislamiento por ruta pendiente de rutas de datos |
-| AC02 | Sesión compatible con poco tiempo y material limitado | P0 | 2 | motor, catálogo | Unidad: generador con perfil 15 min + mancuernas | ⬜ |
-| AC03 | Prescripción ≠ ejecución; corregir una serie no destruye el resto | P0 | 2 | registro | Integración | ⬜ |
-| AC04 | Sesión en curso sobrevive a recargar y reabrir | P0 | 2/4 | registro | E2E recarga | ⬜ |
-| AC05 | Offline + sync sin perder ni duplicar series | P0 | 4 | cola local | E2E offline | ⬜ |
+| AC01 | Registro, acceso, recuperación; aislamiento entre usuarios | P0 | 1–2 | — | E2E `auth.spec.ts`, `training.spec.ts`; integración `training.test.ts` (sesiones y series ajenas → 404) | ✅ |
+| AC02 | Sesión compatible con poco tiempo y material limitado | P0 | 2 | motor, catálogo | Unidad `planner.test.ts` (10/15/20 min × 3 tipos); E2E con 12 min | ✅ |
+| AC03 | Prescripción ≠ ejecución; corregir una serie no destruye el resto | P0 | 2 | registro | Integración + E2E de corrección | ✅ |
+| AC04 | Sesión en curso sobrevive a recargar y reabrir | P0 | 2/4 | registro | E2E: recarga a mitad de sesión conserva series y descanso | ✅ (página ya abierta; abrir sin conexión: paso 4) |
+| AC05 | Offline + sync sin perder ni duplicar series | P0 | 4 | cola local | Integración (reenvío idempotente) + E2E sin conexión | 🟡 cola y sincronización ✅; service worker pendiente |
 | AC06 | Dos dispositivos → una sola recompensa | P0 | 1 | libro XP | Integración: 5 concesiones concurrentes | ✅ |
-| AC07 | Fallo intermedio sin XP huérfana ni daño doble | P0 | 2–3 | transacción de cierre | Integración con fallo inyectado | 🟡 concesión atómica ✅; cierre de sesión pendiente |
-| AC08 | Sin progresión con datos insuficientes/anómalos | P0 | 2 | motor | Unidad | ⬜ |
-| AC09 | Propuesta fuera de límites rechazada aunque la pida Claude | P0 | 3 | validador | Unidad | ⬜ |
-| AC10 | Dolor bloquea el ajuste, sin castigo ni bonus | P0 | 2 | chequeo diario | Unidad + integración | ⬜ |
-| AC11 | Descanso/enfermedad/vacaciones/fallo técnico sin castigo | P0 | 3 | penalizaciones | Unidad | ⬜ |
+| AC07 | Fallo intermedio sin XP huérfana ni daño doble | P0 | 2–3 | transacción de cierre | Integración con fallo inyectado | 🟡 sesión ✅; daño de jefe en paso 3 |
+| AC08 | Sin progresión con datos insuficientes/anómalos | P0 | 2 | motor | Unidad `progression.test.ts` | ✅ |
+| AC09 | Propuesta fuera de límites rechazada aunque la pida Claude | P0 | 3 | validador | Unidad `planner.test.ts` (validador) | 🟡 validador ✅; conexión con Claude en paso 3 |
+| AC10 | Dolor bloquea el ajuste, sin castigo ni bonus | P0 | 2 | chequeo diario | Unidad + integración + E2E | ✅ |
+| AC11 | Descanso/enfermedad/vacaciones/fallo técnico sin castigo | P0 | 3 | penalizaciones | Unidad | 🟡 descanso, «hoy no puedo» y exención ✅; penalización en paso 3 |
 | AC12 | Una sola penalización dentro del máximo; revertible | P1 | 3 | impulso | Unidad `momentum.test.ts` (límites ✅); reversión pendiente | 🟡 |
 | AC13 | Jefe usa trabajo planificado, sin volumen extra | P1 | 3 | jefes | Unidad | ⬜ |
-| AC14 | Cambios de día/zona/horario no duplican | P0 | 2–5 | calendario | Unidad con zonas IANA | ⬜ |
+| AC14 | Cambios de día/zona/horario no duplican | P0 | 2–5 | calendario | Unidad (zonas IANA, cambio de hora) + integración (misión única en paralelo) | 🟡 misiones ✅; recordatorios en paso 4 |
 | AC15 | IA caída/límite/JSON inválido no rompe el entrenamiento | P0 | 3 | adaptador IA | Integración con adaptador fallido | 🟡 la app ya funciona sin IA (modo demo) |
 | AC16 | Página web maliciosa no cambia permisos ni reglas | P1 | 5 | investigación | Integración | ⬜ |
 | AC17 | Ejercicio de internet no entra sin revisión | P1 | 5 | catálogo | Integración | ⬜ |
@@ -28,7 +28,7 @@ Estado: ✅ probado · 🟡 parcial · ⬜ pendiente. «Probado» significa con 
 | AC19 | Secretos fuera de bundles, respuestas, repo y logs | P0 | 1→6 | — | Búsqueda en `.next/static` + revisión del repo | 🟡 comprobado manualmente en paso 1 |
 | AC20 | Exportación, borrado y cierre de sesión respetan alcance | P0 | 6 | — | E2E | ⬜ |
 | AC21 | Usable en móvil y escritorio, teclado, movimiento reducido | P0 | 1→4 | — | E2E escritorio + Pixel 7 emulado; foco visible; `prefers-reduced-motion` | 🟡 pantallas actuales ✅ |
-| AC22 | Temporizador recupera estado tras segundo plano | P0 | 2/4 | registro | Unidad basada en marcas de tiempo | ⬜ |
+| AC22 | Temporizador recupera estado tras segundo plano | P0 | 2/4 | registro | Unidad `dates-timer.test.ts` + E2E recarga | ✅ |
 | AC23 | Presupuesto limita trabajos y reintentos antes de gastar | P0 | 3/5 | IA, cola | Integración | ⬜ |
 | AC24 | Corregir/deshacer no permite reclamar XP repetida | P0 | 1 | libro XP | Integración | ✅ |
 

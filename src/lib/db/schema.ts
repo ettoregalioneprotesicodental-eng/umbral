@@ -8,8 +8,10 @@ import {
   uniqueIndex,
   index,
   check,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { SessionPrescription } from "@/domain/training/types";
 
 /* ------------------------------------------------------------------ */
 /* Autenticación (tablas requeridas por Better Auth)                   */
@@ -115,6 +117,8 @@ export const profile = pgTable(
     primaryGoal: text("primary_goal"),
     secondaryGoals: jsonb("secondary_goals").$type<string[]>().notNull().default([]),
     daysPerWeek: integer("days_per_week"),
+    /** Días ISO (1 = lunes … 7 = domingo) en los que quiere entrenar. */
+    trainingDays: jsonb("training_days").$type<number[]>().notNull().default([]),
     minutesPerSession: integer("minutes_per_session"),
     location: text("location").$type<TrainingLocation>(),
     equipment: jsonb("equipment").$type<EquipmentItem[]>().notNull().default([]),
@@ -188,5 +192,119 @@ export const experienceEvent = pgTable(
       .on(t.correctsEventId)
       .where(sql`${t.correctsEventId} IS NOT NULL`),
     index("xp_event_user_created_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* Entrenamiento                                                       */
+/* ------------------------------------------------------------------ */
+
+export type MissionStatus = "planned" | "in_progress" | "completed" | "partial" | "postponed" | "exempt" | "skipped";
+
+/**
+ * Misión principal de un día local. Una por usuario y día (índice único), así que
+ * refrescar, cambiar de zona o abrir dos pestañas no crea duplicados (AC14).
+ * La prescripción es inmutable una vez iniciada la sesión.
+ */
+export const plannedSession = pgTable(
+  "planned_session",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    localDate: text("local_date").notNull(),
+    timeZone: text("time_zone").notNull(),
+    kind: text("kind").$type<SessionPrescription["kind"]>().notNull(),
+    prescription: jsonb("prescription").$type<SessionPrescription>().notNull(),
+    rulesVersion: text("rules_version").notNull(),
+    /** Revisión de la prescripción mientras siga sin empezar. */
+    revision: integer("revision").notNull().default(1),
+    status: text("status").$type<MissionStatus>().notNull().default("planned"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("planned_session_user_date_uq").on(t.userId, t.localDate),
+    check("local_date_format", sql`${t.localDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`),
+  ],
+);
+
+export const dailyCheckin = pgTable(
+  "daily_checkin",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    localDate: text("local_date").notNull(),
+    availableMinutes: integer("available_minutes"),
+    energy: integer("energy"),
+    fatigue: integer("fatigue"),
+    discomfort: text("discomfort").$type<"none" | "mild" | "moderate" | "red_flag">().notNull(),
+    areas: jsonb("areas").$type<string[]>().notNull().default([]),
+    redFlags: jsonb("red_flags").$type<string[]>().notNull().default([]),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("daily_checkin_user_date_uq").on(t.userId, t.localDate),
+    check("energy_range", sql`${t.energy} IS NULL OR ${t.energy} BETWEEN 1 AND 5`),
+    check("fatigue_range", sql`${t.fatigue} IS NULL OR ${t.fatigue} BETWEEN 1 AND 5`),
+  ],
+);
+
+export const workoutSession = pgTable(
+  "workout_session",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    plannedSessionId: text("planned_session_id").notNull().references(() => plannedSession.id, { onDelete: "cascade" }),
+    localDate: text("local_date").notNull(),
+    /** Copia de la prescripción en el momento de empezar: plan ≠ ejecución. */
+    prescription: jsonb("prescription").$type<SessionPrescription>().notNull(),
+    status: text("status").$type<"in_progress" | "completed" | "abandoned">().notNull().default("in_progress"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    xpAwarded: integer("xp_awarded"),
+    note: text("note"),
+  },
+  (t) => [
+    uniqueIndex("workout_session_planned_uq").on(t.plannedSessionId),
+    index("workout_session_user_date_idx").on(t.userId, t.localDate),
+  ],
+);
+
+/**
+ * Series registradas. El id lo genera el cliente: reenviar la misma operación no duplica (AC05).
+ * Deshacer = marca de borrado; corregir = nueva revisión de la misma fila.
+ */
+export const setLog = pgTable(
+  "set_log",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull().references(() => workoutSession.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id").notNull(),
+    /** Ranura de la prescripción (permite sustituir el ejercicio manteniendo la finalidad). */
+    slot: text("slot").notNull(),
+    setIndex: integer("set_index").notNull(),
+    kind: text("kind").$type<"warmup" | "working" | "incomplete" | "skipped">().notNull(),
+    reps: integer("reps"),
+    seconds: integer("seconds"),
+    loadValue: numeric("load_value", { precision: 6, scale: 2 }),
+    loadUnit: text("load_unit").$type<"kg" | "lb">(),
+    rir: integer("rir"),
+    discomfort: boolean("discomfort").notNull().default(false),
+    note: text("note"),
+    revision: integer("revision").notNull().default(1),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("set_log_session_idx").on(t.sessionId),
+    index("set_log_user_exercise_idx").on(t.userId, t.exerciseId, t.createdAt),
+    check("reps_range", sql`${t.reps} IS NULL OR ${t.reps} BETWEEN 0 AND 1000`),
+    check("seconds_range", sql`${t.seconds} IS NULL OR ${t.seconds} BETWEEN 0 AND 36000`),
+    check("rir_range", sql`${t.rir} IS NULL OR ${t.rir} BETWEEN 0 AND 10`),
+    check("load_has_unit", sql`(${t.loadValue} IS NULL) = (${t.loadUnit} IS NULL)`),
   ],
 );
