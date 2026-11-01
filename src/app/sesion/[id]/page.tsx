@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/session";
-import { db } from "@/lib/db";
+import { db, schema } from "@/lib/db";
+import { and, eq as dEq, sql } from "drizzle-orm";
+import { getBoss } from "@/domain/game/content";
 import { checkinToInput, getCheckin, getProfile, getSession, NotFoundError, previousResults } from "@/server/training";
 import { getExercise, requireExercise, WARMUP_STEPS } from "@/domain/training/catalog";
 import { equipmentContext } from "@/domain/training/equipment";
@@ -34,12 +36,25 @@ export default async function SesionPage({ params }: { params: Promise<{ id: str
   }));
 
   if (session.status === "completed") {
+    // Sello roto por ESTA misión (si lo hubo) y su número, para mostrar la línea de historia correcta.
+    const [seal] = await db.select({ ev: schema.bossEvent, bossId: schema.bossEncounter.bossId }).from(schema.bossEvent)
+      .innerJoin(schema.bossEncounter, dEq(schema.bossEncounter.id, schema.bossEvent.encounterId))
+      .where(and(dEq(schema.bossEvent.missionId, session.plannedSessionId), dEq(schema.bossEncounter.userId, user.id)));
+    let sealLine: string | null = null;
+    if (seal) {
+      // Comparación en SQL para no perder los microsegundos de la marca de tiempo.
+      const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.bossEvent)
+        .where(and(dEq(schema.bossEvent.encounterId, seal.ev.encounterId),
+          sql`${schema.bossEvent.createdAt} <= (select created_at from boss_event where id = ${seal.ev.id})`)) as [{ n: number }];
+      sealLine = getBoss(seal.bossId).sealLines[n - 1] ?? null;
+    }
     return (
       <AppShell current="/hoy" reducedMotion={profile?.reducedMotion}>
         <section className="system-window" data-testid="summary" style={{ maxWidth: 720, margin: "0 auto" }}>
           <p className="label">Resumen · {session.localDate}</p>
           <h1>Misión registrada</h1>
           <p className="reward" style={{ fontSize: "1.3rem" }}>+{session.xpAwarded ?? 0} XP</p>
+          {seal && <p data-testid="seal-broken">{sealLine ?? "Un sello del Guardián se ha roto."} <Link href="/cazador">Ver cazador</Link></p>}
           <table className="log">
             <thead><tr><th>Ejercicio</th><th>Series registradas</th></tr></thead>
             <tbody>

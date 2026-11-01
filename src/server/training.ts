@@ -4,13 +4,14 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "@/lib/db/schema";
 import { grantXp } from "@/domain/game/ledger";
 import { GAME_RULES_V1 } from "@/domain/game/rules";
-import { partialMissionXp } from "@/domain/game/xp";
+import { levelFromTotalXp, partialMissionXp } from "@/domain/game/xp";
 import { getExercise } from "@/domain/training/catalog";
 import { daysBetween, isoWeekday, localDate } from "@/domain/training/dates";
 import { equipmentContext } from "@/domain/training/equipment";
 import { defaultTrainingDays, generateSession, makeAllowed, sessionKindFor, type PlannerContext } from "@/domain/training/planner";
 import type { CheckinInput, ExercisePerformance, PerformedSet, SessionPrescription } from "@/domain/training/types";
 import { validatePrescription } from "@/domain/training/validate";
+import { applyMissionRewards, type GameOutcome } from "./game";
 
 export type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema>;
 type Profile = typeof schema.profile.$inferSelect;
@@ -231,11 +232,12 @@ export async function confirmRest(db: AnyDb, userId: string, missionId: string) 
       .where(and(eq(schema.plannedSession.id, missionId), eq(schema.plannedSession.userId, userId))).for("update");
     if (!m) throw new NotFoundError("Misión no encontrada");
     if (m.kind !== "rest" || m.prescription.exercises.length > 0) throw new ConflictError("Esta misión no es un descanso");
-    if (m.status === "completed") return { xp: 0, already: true };
+    if (m.status === "completed") return { xp: 0, already: true, game: null };
     if (m.status !== "planned") throw new ConflictError("La misión no está disponible");
     const r = await grantXp(tx, { userId, idempotencyKey: `mission:${m.id}`, amount: GAME_RULES_V1.xp.dailyMissionMax, reason: "daily_mission", source: `rest:${m.localDate}` });
     await tx.update(schema.plannedSession).set({ status: "completed", updatedAt: new Date() }).where(eq(schema.plannedSession.id, m.id));
-    return { xp: r.granted ? GAME_RULES_V1.xp.dailyMissionMax : 0, already: !r.granted };
+    const game = await applyMissionRewards(tx, userId, { id: m.id, kind: m.kind, localDate: m.localDate }, { sealEligible: false });
+    return { xp: r.granted ? GAME_RULES_V1.xp.dailyMissionMax : 0, already: !r.granted, game };
   });
 }
 
@@ -349,7 +351,7 @@ export async function finishSession(db: AnyDb, userId: string, sessionId: string
     const [ws] = await tx.select().from(schema.workoutSession)
       .where(and(eq(schema.workoutSession.id, sessionId), eq(schema.workoutSession.userId, userId))).for("update");
     if (!ws) throw new NotFoundError("Sesión no encontrada");
-    if (ws.status === "completed") return { xp: ws.xpAwarded ?? 0, status: "completed" as const, already: true, levelUp: 0 };
+    if (ws.status === "completed") return { xp: ws.xpAwarded ?? 0, status: "completed" as const, already: true, levelUp: 0, game: null as GameOutcome | null };
 
     const sets = await tx.select({ slot: schema.setLog.slot, kind: schema.setLog.kind }).from(schema.setLog)
       .where(and(eq(schema.setLog.sessionId, ws.id), isNull(schema.setLog.deletedAt)));
@@ -359,6 +361,7 @@ export async function finishSession(db: AnyDb, userId: string, sessionId: string
     const missionStatus = allDone ? "completed" : "partial";
 
     let levelUp = 0;
+    let levelBeforeAll = 0;
     if (xp > 0) {
       const r = await grantXp(tx, {
         userId,
@@ -368,15 +371,31 @@ export async function finishSession(db: AnyDb, userId: string, sessionId: string
         source: `session:${ws.id}`,
       });
       levelUp = r.levelAfter - r.levelBefore;
+      levelBeforeAll = r.levelAfter;
     }
-    if (opts.failAfterGrant) throw new Error("Fallo simulado tras conceder XP");
-
     await tx.update(schema.workoutSession).set({ status: "completed", endedAt: new Date(), xpAwarded: xp })
       .where(eq(schema.workoutSession.id, ws.id));
     await tx.update(schema.plannedSession).set({ status: missionStatus, updatedAt: new Date() })
       .where(eq(schema.plannedSession.id, ws.plannedSessionId));
-    return { xp, status: missionStatus, already: false, levelUp };
+
+    // Efectos de juego en la MISMA transacción: si algo falla, no queda XP ni daño de jefe huérfano (AC07).
+    let game: GameOutcome | null = null;
+    if (xp > 0) {
+      game = await applyMissionRewards(tx, userId, { id: ws.plannedSessionId, kind: ws.prescription.kind, localDate: ws.localDate }, { sealEligible: allDone });
+      if (game.bossXp > 0) levelUp += levelsGained(levelBeforeAll, (await currentTotalXp(tx, userId)));
+    }
+    if (opts.failAfterGrant) throw new Error("Fallo simulado tras conceder XP y efectos de juego");
+    return { xp, status: missionStatus, already: false, levelUp, game };
   });
+}
+
+async function currentTotalXp(tx: AnyDb, userId: string) {
+  const [c] = await tx.select({ t: schema.character.totalXp }).from(schema.character).where(eq(schema.character.userId, userId));
+  return c?.t ?? 0;
+}
+
+function levelsGained(levelBefore: number, totalXpAfter: number) {
+  return Math.max(0, levelFromTotalXp(totalXpAfter).level - levelBefore);
 }
 
 /* ------------------------------------------------------------------ */

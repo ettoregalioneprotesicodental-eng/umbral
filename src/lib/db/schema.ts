@@ -308,3 +308,149 @@ export const setLog = pgTable(
     check("load_has_unit", sql`(${t.loadValue} IS NULL) = (${t.loadUnit} IS NULL)`),
   ],
 );
+
+/* ------------------------------------------------------------------ */
+/* IA: ejecuciones, presupuesto, conversación y propuestas             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cada llamada (o intento) a la IA queda registrada. El gasto se RESERVA antes de llamar
+ * y se liquida después, de modo que el presupuesto limita trabajos concurrentes (AC23).
+ */
+export const aiRun = pgTable(
+  "ai_run",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    purpose: text("purpose").$type<"coach_chat" | "story" | "research">().notNull(),
+    status: text("status").$type<"reserved" | "ok" | "error" | "refused_budget" | "refusal">().notNull(),
+    model: text("model"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    /** Microdólares (USD × 1e6) reservados antes de la llamada. */
+    reservedMicroUsd: integer("reserved_micro_usd").notNull().default(0),
+    /** Coste estimado real tras la llamada, con la tabla de precios configurada. */
+    costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+    toolCalls: jsonb("tool_calls").$type<{ name: string; ok: boolean }[]>().notNull().default([]),
+    error: text("error"),
+    rulesVersion: text("rules_version"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("ai_run_user_created_idx").on(t.userId, t.createdAt)],
+);
+
+export const coachMessage = pgTable(
+  "coach_message",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "assistant">().notNull(),
+    content: text("content").notNull(),
+    /** template = respuesta guardada; model = generada por Claude; unavailable = aviso de indisponibilidad. */
+    origin: text("origin").$type<"user" | "template" | "model" | "unavailable">().notNull(),
+    runId: text("run_id"),
+    proposalId: text("proposal_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("coach_message_user_created_idx").on(t.userId, t.createdAt)],
+);
+
+/** Propuestas de cambio de la misión. Nunca se aplican sin validación y sin confirmación del usuario. */
+export const planProposal = pgTable(
+  "plan_proposal",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    plannedSessionId: text("planned_session_id").notNull().references(() => plannedSession.id, { onDelete: "cascade" }),
+    baseRevision: integer("base_revision").notNull(),
+    proposal: jsonb("proposal").$type<SessionPrescription>().notNull(),
+    reason: text("reason").notNull(),
+    valid: boolean("valid").notNull(),
+    errors: jsonb("errors").$type<string[]>().notNull().default([]),
+    source: text("source").$type<"claude" | "rules">().notNull(),
+    status: text("status").$type<"pending" | "applied" | "rejected" | "stale">().notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [index("plan_proposal_user_idx").on(t.userId, t.createdAt)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Juego: jefes, impulso, inventario y hechos de campaña               */
+/* ------------------------------------------------------------------ */
+
+export const bossEncounter = pgTable(
+  "boss_encounter",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    bossId: text("boss_id").notNull(),
+    seals: integer("seals").notNull(),
+    sealsBroken: integer("seals_broken").notNull().default(0),
+    status: text("status").$type<"active" | "defeated">().notNull().default("active"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    defeatedAt: timestamp("defeated_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("boss_encounter_user_boss_uq").on(t.userId, t.bossId),
+    check("seals_range", sql`${t.sealsBroken} BETWEEN 0 AND ${t.seals}`),
+  ],
+);
+
+/** Un sello roto por misión como máximo (AC06/AC07/AC24). */
+export const bossEvent = pgTable(
+  "boss_event",
+  {
+    id: text("id").primaryKey(),
+    encounterId: text("encounter_id").notNull().references(() => bossEncounter.id, { onDelete: "cascade" }),
+    missionId: text("mission_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("boss_event_mission_uq").on(t.encounterId, t.missionId)],
+);
+
+export const momentumEvent = pgTable(
+  "momentum_event",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    missionId: text("mission_id").notNull(),
+    /** Fecha local a la que se imputa (semana de la penalización o día de la recuperación). */
+    localDate: text("local_date").notNull(),
+    weekStart: text("week_start").notNull(),
+    delta: integer("delta").notNull(),
+    reason: text("reason").$type<"skip" | "recovery" | "revert">().notNull(),
+    rulesVersion: text("rules_version").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("momentum_event_mission_reason_uq").on(t.missionId, t.reason),
+    index("momentum_event_user_week_idx").on(t.userId, t.weekStart),
+  ],
+);
+
+export const userItem = pgTable(
+  "user_item",
+  {
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    itemId: text("item_id").notNull(),
+    source: text("source").notNull(),
+    equipped: boolean("equipped").notNull().default(true),
+    acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("user_item_uq").on(t.userId, t.itemId)],
+);
+
+/** Hechos canónicos de la campaña: lo que la narrativa puede recordar. */
+export const storyFact = pgTable(
+  "story_fact",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("story_fact_user_key_uq").on(t.userId, t.key)],
+);

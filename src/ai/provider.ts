@@ -2,27 +2,26 @@
  * Capa de IA sustituible. La aplicación funciona entera sin ella: el plan, el registro
  * y las recompensas se calculan con código. Claude solo explica, propone y redacta.
  */
-export type AiMode = "demo" | "claude";
+import { getAiConfig, type AiMode } from "./config";
+export type { AiMode } from "./config";
 
 export interface AiStatus {
   mode: AiMode;
-  /** true solo si hay modo claude, clave en el servidor y modelo configurado. */
+  /** true solo si hay modo claude y clave en el servidor. */
   available: boolean;
+  model?: string;
   reason?: string;
 }
 
 export function getAiStatus(): AiStatus {
-  const mode: AiMode = process.env.AI_MODE === "claude" ? "claude" : "demo";
-  if (mode === "demo") {
-    return { mode, available: false, reason: "Modo demostración: sin llamadas a la API ni coste." };
+  const c = getAiConfig();
+  if (c.mode === "demo") {
+    return { mode: c.mode, available: false, reason: "Modo demostración: respuestas de plantilla, sin llamadas a la API ni coste." };
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { mode, available: false, reason: "Falta ANTHROPIC_API_KEY en los secretos del servidor." };
+  if (!c.hasKey) {
+    return { mode: c.mode, available: false, reason: "Falta ANTHROPIC_API_KEY en los secretos del servidor." };
   }
-  if (!process.env.CLAUDE_MODEL) {
-    return { mode, available: false, reason: "Falta CLAUDE_MODEL en la configuración del servidor." };
-  }
-  return { mode, available: true };
+  return { mode: c.mode, available: true, model: c.model };
 }
 
 export interface GreetingContext {
@@ -39,7 +38,7 @@ export interface GeneratedText {
   origin: "template" | "model";
 }
 
-/** Saludo del sistema. En esta fase siempre es una plantilla identificada. */
+/** Saludo del sistema. Siempre es una plantilla identificada (no gasta IA en cada visita). */
 export function systemGreeting(ctx: GreetingContext): GeneratedText {
   const text = !ctx.onboarded
     ? `Sistema: despertar confirmado, ${ctx.alias}. Tu portal se abrirá cuando completes la calibración.`
